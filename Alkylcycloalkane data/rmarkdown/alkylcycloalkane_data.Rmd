@@ -1,0 +1,159 @@
+---
+title: "Alkylcycloalkane Data"
+author: "BH"
+date: "2023-01-02"
+output: 
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Code written and executed by **Blake Hunnie** (hunnieb@myumanitoba.ca)
+This R-markdown file is intended for the reproducibility of manipulating and presenting data from the BIOS site.
+Most of the code included below comes from the **tidyverse**, rather than solely **Base-R**.
+
+# All necessary data & information must be loaded into R:
+## First, the packages included in my typical workflows are loaded:
+
+```{r loading packages}
+
+library(tidyverse)
+library(janitor)
+library(here)
+library(gt)
+library(broom) 
+library(fs)
+library(viridis)
+
+```
+
+
+
+```{r loading dataset}
+
+alkylcycloalkane_data <- read_csv(here("data", "tidy_individual_aca_percentages.csv")) %>% #loading in the csv.file dataset
+  clean_names() %>% #altering column names in accordance with the tidyverse
+  pivot_longer(cols = c(n_hexylcyclohexane, n_heptylcyclohexane, n_octylcyclohexane, n_nonylcyclohexane, n_decylcyclohexane, n_undecylcyclohexane, n_dodecylcyclohexane, n_tridecylcyclohexane, n_tetradecylcyclohexane), names_to = "parameter", values_to = "measure") #taking many columns and condensing them into fewer, longer columns
+alkylcycloalkane_data #calling the dataset
+
+```
+
+
+
+```{r nesting data}
+
+nested_data <- alkylcycloalkane_data %>% #assigning the dataset to an object
+  group_by(site, sample_depth, sample_type) %>% #grouping the data based on 3 variables: site, sample depth, and sample type
+  nest() #nesting the data
+nested_data #calling the nested data
+
+```
+
+
+```{r creating nested plots}
+
+nested_plots <- nested_data %>% #assigning the nested data to an object
+  mutate(plot = pmap(list(site, sample_type, sample_depth, data), #creating individual objects to automatically generate plots from
+                     ~ ggplot() + #creating a ggplot item
+                       geom_col(data = ..4, aes(x = parameter, y = measure, fill = sample_id), colour = "black", position = "dodge") + #sequentially creating bar plots from the nested data
+                       labs(y = "Percent of total (%)") + #labelling the y-axis
+                       scale_x_discrete(limits = c("n_hexylcyclohexane", "n_heptylcyclohexane", "n_octylcyclohexane", "n_nonylcyclohexane", "n_decylcyclohexane", "n_undecylcyclohexane", "n_dodecylcyclohexane", "n_tridecylcyclohexane", "n_tetradecylcyclohexane")) + #ordering the observations on the x-axis
+                       theme_minimal() + #applying the tidyverse minimal theme to the plots
+                       scale_fill_viridis(discrete = TRUE) + #changing the colour palette
+                       theme(axis.title.x = element_blank(), #removing the title from the x-axis
+                             axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.9), #changing the angle of the x-axis text
+                             legend.title = element_blank(), #removing the title from the legend
+                             axis.ticks.x = element_line(size = 0.25), #changing the size of the x-axis ticks
+                             panel.grid.major.x = element_blank(), #removing the panelling
+                             legend.position = "bottom"), #moving the position of the legend
+                     labs(title = str_c(..1, ..2, ..3, "sediments", sep = ", "))), #labelling the plots based on the sequential variables being observed
+         filename = str_c(site, sample_type, sample_depth, "plot.pdf", sep = "_")) #saving the filenames based on these variables
+nested_plots #calling the list of plots
+
+```
+
+
+
+```{r saving the individual plots}
+
+nested_plots_save <- nested_plots %>% #assigning the list of plots to an object
+  ungroup() %>%  #ungrouping the data to save individual files
+  select(filename, plot) %>% #selecting the two parameters to save the files from
+  pwalk(ggsave, path =  here("figures"), width = 190, height = 120, units = "mm") #sequentially saving each file
+
+```
+
+##This next section is dedicated to creating individual plots from the control sample datasets 
+
+```{r loading in mean control dataset}
+
+aca_control <- read_csv(here("data", "controls_alkylcycloalkanes.csv")) %>% #importing the csv.file dataset
+  clean_names() %>% #renaing the columns in accordance to the tidycerse
+  pivot_longer(cols = c(n_hexylcyclohexane, n_heptylcyclohexane, n_octylcyclohexane, n_nonylcyclohexane, n_decylcyclohexane, n_undecylcyclohexane, n_dodecylcyclohexane, n_tridecylcyclohexane, n_tetradecylcyclohexane), names_to = "parameter", values_to = "measure") #onsolidating many columns into fewer columns
+aca_control #calling the data
+
+```
+
+
+```{r creating control plot}
+
+control_plot <- aca_control %>%  #assigning the control dataset to an object
+  mutate(across(sample_id, factor, levels=c("surface control","subsurface control"))) %>% #separating the results based on sample depth
+  ggplot() + #creating a ggplot item
+  geom_col(aes(x = parameter, y = measure, fill = sample_id), colour = "black", position = "dodge") + #creating bar plots
+  labs(y = "Percent of total (%)") + #labelling the y-axis
+  scale_x_discrete(limits = c("n_hexylcyclohexane", "n_heptylcyclohexane", "n_octylcyclohexane", "n_nonylcyclohexane", "n_decylcyclohexane", "n_undecylcyclohexane", "n_dodecylcyclohexane", "n_tridecylcyclohexane", "n_tetradecylcyclohexane")) + #assigning the order of the observations on the x-axis
+  theme_minimal() + #applying the minimal tidyverse theme to the plot
+  scale_fill_viridis(discrete = TRUE) + #changing the colour palette 
+  theme(axis.title.x = element_blank(), #removing the title from the x-axis
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.9), #changing the angle of the x-axis text
+        legend.title = element_blank(), #removing the title from the legend
+        axis.ticks.x = element_line(size = 0.25), #changing the size of the x-axis tick marks
+        panel.grid.major.x = element_blank(), #removing the panelling
+        legend.position = "bottom") #changing the position of the legend
+control_plot #calling the plot
+
+ggsave(here("figures", "control_plot.pdf"), control_plot, #saving the plot as a pdf file
+       width = 190, height = 120, units = "mm") #csetting the size parameters of the plot
+
+```
+
+##Finally, this section does the same as the control samples, but for the technical mixture (refer to comments in the above section)
+
+```{r loading in technical mixture dataset}
+
+lagomedio_data <- read_csv(here("data", "tidy_lagomedio_aca_percentages.csv")) %>%
+  clean_names() %>%
+   pivot_longer(cols = c(n_hexylcyclohexane, n_heptylcyclohexane, n_octylcyclohexane, n_nonylcyclohexane, n_decylcyclohexane, n_undecylcyclohexane, n_dodecylcyclohexane, n_tridecylcyclohexane, n_tetradecylcyclohexane), names_to = "parameter", values_to = "measure")
+
+```
+
+
+```{r generating technical mixture plot}
+
+lagomedio_plot <- lagomedio_data %>%
+  ggplot() +
+  geom_col(aes(x = parameter, y = measure, fill = sample_id), colour = "black", position = "dodge") +
+  labs(y = "Percent of total (%)") +
+  scale_x_discrete(limits = c("n_hexylcyclohexane", "n_heptylcyclohexane", "n_octylcyclohexane", "n_nonylcyclohexane", "n_decylcyclohexane", "n_undecylcyclohexane", "n_dodecylcyclohexane", "n_tridecylcyclohexane", "n_tetradecylcyclohexane")) +
+  theme_minimal() +
+  #scale_fill_viridis(discrete = TRUE) +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.9),
+        legend.title = element_blank(),
+        axis.ticks.x = element_line(size = 0.25),
+        panel.grid.major.x = element_blank(),
+        legend.position = "bottom")
+lagomedio_plot
+
+ggsave(here("figures", "lagomedio_plot.pdf"), lagomedio_plot,
+       width = 190, height = 120, units = "mm") 
+
+```
+
+
+
+

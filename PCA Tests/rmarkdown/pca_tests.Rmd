@@ -1,0 +1,74 @@
+---
+title: "N-alkane PCA"
+author: "BH"
+date: "2023-01-10"
+output: 
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Code written and executed by **Blake Hunnie** (hunnieb@myumanitoba.ca)
+This R-markdown file is intended for the reproducibility of manipulating and presenting data from the BIOS site.
+Most of the code included below comes from the **tidyverse**, rather than solely **Base-R**.
+
+# All necessary data & information must be loaded into R:
+## First, the packages included in my typical workflows are loaded:
+
+```{r loading packages}
+
+library(tidyverse)
+library(janitor)
+library(here)
+library(gt)
+library(broom) 
+library(fs)
+library(stats)
+library(ggrepel)
+library(patchwork)
+library(ggfortify)
+library(knitr)
+library(viridis)
+
+```
+
+
+```{r loading in dataset}
+
+alkane_dataset <- read_csv(here("data", "tidy_individual_alkanes_pca.csv")) #loading in the csv.file dataset
+
+```
+
+
+```{r performing the PCA}
+
+nalk_pca <- alkane_dataset %>% #assigning the loaded dataset to an object
+  nest() %>% #nesting the data
+  mutate(pca = map(data, ~prcomp(.x %>% select(-site, -sample_id), center = TRUE, scale = TRUE)), #performing a PCA while distinguishing results based on the sites and sample IDs
+         pca_aug = map2(pca, data, ~augment(.x, data = .y))) #adding augmented data from the PCA to the dataset 
+nalk_pca #calling the object
+
+```
+
+
+```{r plotting the PCA}
+
+test_plot <- nalk_pca %>% #assigning the PCA results to an object
+  mutate(pca_graph = map2(.x = pca, .y = data, 
+                          ~autoplot(.x, loadings = TRUE, loadings.label = TRUE, loadings.label.repel = TRUE, loadings.colour = "black", loadings.label.colour = "black",
+                                    data = .y, label = TRUE, label.label = "sample_id", label.repel = TRUE, colour = "site", face = "bold") + #plotting the results of the PCA
+                            geom_hline(aes(yintercept = 0), linetype = "dashed", alpha = 0.5) + #adding a dashed horizontal line on y=0
+                            geom_vline(aes(xintercept = 0), linetype = "dashed", alpha = 0.5) + #adding a dashed vertical line on x=0
+                            theme_classic() + #applying the classic tidyverse theme to the plot
+                            theme(legend.title = element_blank(), #removing the legend title
+                                  legend.position = "bottom"))) #changing the position of the legend
+test_plot$pca_graph #calling the PCA plot
+
+#The plot can be saved by right-clicking the image and selecting "save image as."
+
+```
+
+
